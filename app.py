@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-from folium.plugins import MarkerCluster
 
 st.set_page_config(layout="wide", page_title="Mapa de Engenharia")
 st.title("🗺️ Mapa da Engenharia")
@@ -61,14 +60,19 @@ except Exception as e:
     st.stop()
 
 def obter_cor(classificacao):
-    classe = str(classificacao).lower()
-    if 'alta' in classe or 'urgente' in classe or 'a' in classe:
-        return '#FF0000' # Vermelho
-    elif 'media' in classe or 'morna' in classe or 'b' in classe:
-        return '#FFA500' # Laranja
-    elif 'baixa' in classe or 'fria' in classe or 'c' in classe:
+    # Converte para maiúsculo para bater certinho com a sua regra
+    classe = str(classificacao).upper().strip()
+    
+    if 'PREVENTIVA' in classe:
         return '#008000' # Verde
-    return '#1f77b4' # Azul padrão para células sem correspondência ou vazias do PROCX
+    elif 'IMPLANTAÇÃO' in classe or 'IMPLANTACAO' in classe:
+        return '#1f77b4' # Azul
+    elif 'CORRETIVA' in classe:
+        return '#FFA500' # Laranja
+    elif 'APOIO' in classe:
+        return '#4F4F4F' # Cinza Escuro
+    else:
+        return '#D3D3D3' # Cinza Claro para qualquer outro tipo ou vazio do PROCX
 
 st.sidebar.header("🔍 Centralizar Coordenada")
 coordenada_livre = st.sidebar.text_input("Digite ou cole a coordenada (Lat, Lon):", placeholder="-31.9460, -51.9617")
@@ -93,11 +97,19 @@ m = folium.Map(location=[centro_lat, centro_lon], zoom_start=zoom_inicial, contr
 if coordenada_livre:
     folium.CircleMarker(location=[centro_lat, centro_lon], radius=10, color="black", fill=True, fill_color="yellow", fill_opacity=1, popup="Sua busca").add_to(m)
 
-marker_cluster = MarkerCluster(disable_clustering_at_zoom=16).add_to(m)
-
+# Desenhando as bolinhas diretamente no mapa (sem o agrupador) para ficarem fixas
 for _, linha in df_mapa.iterrows():
     cor = obter_cor(linha['classificacao_cor'])
     texto = f"<b>Classificação:</b> {linha['classificacao_cor']}<br><b>Descrição:</b> {linha['descricao_popup']}"
-    folium.CircleMarker(location=[linha['lat'], linha['lon']], radius=6, color=cor, fill=True, fill_color=cor, fill_opacity=0.8, popup=folium.Popup(texto, max_width=300)).add_to(marker_cluster)
+    
+    folium.CircleMarker(
+        location=[linha['lat'], linha['lon']], 
+        radius=5, # Bolinhas levemente menores para não poluir o mapa estático
+        color=cor, 
+        fill=True, 
+        fill_color=cor, 
+        fill_opacity=0.8, 
+        popup=folium.Popup(texto, max_width=300)
+    ).add_to(m)
 
-st_folium(m, width=1300, height=700, returned_objects=[])
+# Mantém o mapa leve
