@@ -64,7 +64,11 @@ except Exception as e:
 
 def obter_cor(classificacao):
     classe = str(classificacao).upper().strip()
-    if 'PREVENTIVA' in classe:
+    
+    # ATUALIZAÇÃO: Nova cor para Rompimento (Vermelho Sangue)
+    if 'ROMPIMENTO' in classe:
+        return '#8B0000' # Vermelho Sangue
+    elif 'PREVENTIVA' in classe:
         return '#008000' # Verde
     elif 'IMPLANTAÇÃO' in classe or 'IMPLANTACAO' in classe:
         return '#1f77b4' # Azul
@@ -122,7 +126,6 @@ if not df_mapa.empty:
 else:
     df_filtrado = pd.DataFrame()
 
-# Campo de busca por coordenada livre
 coordenada_livre = st.sidebar.text_input("Centralizar mapa em (Lat, Lon):", placeholder="-31.9460, -51.9617")
 
 ponto_pesquisado = None
@@ -147,7 +150,6 @@ else:
 
 m = folium.Map(location=[centro_lat, centro_lon], zoom_start=zoom_inicial, control_scale=True)
 
-# 1ª CAMADA: Desenha primeiro os pontos da tabela
 if not df_filtrado.empty:
     st.write(f"🟢 Mostrando **{len(df_filtrado)}** pontos no mapa após os filtros aplicados.")
     for _, linha in df_filtrado.iterrows():
@@ -178,7 +180,6 @@ if not df_filtrado.empty:
 else:
     st.warning("Nenhum registro encontrado para os filtros selecionados.")
 
-# 2ª CAMADA (No topo): Adiciona o Pin clássico vermelho da busca por último para nunca ser coberto!
 if ponto_pesquisado:
     folium.Marker(
         location=ponto_pesquisado,
@@ -186,4 +187,4 @@ if ponto_pesquisado:
         icon=folium.Icon(color="red", icon="info-sign")
     ).add_to(m)
 
-st_folium(m, width=1300, height=700, returned_objects=[], key="mapa_engenharia_filtros_v2")
+st_folium(m, width=1300, height=700, returned_objects=[], key="mapa_engenharia_filtros_v3")
