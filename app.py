@@ -15,27 +15,26 @@ def carregar_dados():
     df = pd.read_csv(URL_CSV, header=None)
     
     df_util = pd.DataFrame()
-    # Pega as colunas físicas H (7), J (9) e L (11)
+    # Pega as colunas físicas H (7), J (9) e L (11) e força tudo para texto limpo
     df_util['coordenada'] = df[7].astype(str).str.strip()
     df_util['classificacao'] = df[9].fillna("").astype(str).str.strip()
     df_util['descricao'] = df[11].fillna("").astype(str).str.strip()
     
-    # Remove a linha de título caso ela apareça
-    df_util = df_util[~df_util['coordenada'].lower().str.contains('coordenada', na=False)]
+    # CORREÇÃO: Garante a conversão para texto antes do .str.lower() para evitar o erro 'Series' object has no attribute 'lower'
+    df_util = df_util[~df_util['coordenada'].astype(str).str.lower().str.contains('coordenada', na=False)]
     
-    # Limpa linhas que estão nulas, vazias ou que tenham o "" do SEERRO
+    # Limpa linhas vazias, nulas ou com o "" do SEERRO da sua fórmula
     df_util = df_util[df_util['coordenada'] != ""]
     df_util = df_util[df_util['coordenada'] != "nan"]
     df_util = df_util[df_util['coordenada'].str.contains(',', na=False)]
     
-    # Se a planilha inteira estiver limpa e vazia após os filtros, para aqui
     if df_util.empty:
         return pd.DataFrame(columns=['lat', 'lon', 'classificacao_cor', 'descricao_popup'])
 
-    # Divide a coordenada em Lat e Lon tratando erros com segurança
+    # Extrai latitude e longitude com segurança contra erros de digitação
     def extrair_lat_lon(txt):
         try:
-            partes = txt.split(',')
+            partes = str(txt).split(',')
             return float(partes[0].strip()), float(partes[1].strip())
         except:
             return None, None
@@ -44,10 +43,10 @@ def carregar_dados():
     df_util['lat'] = [c[0] for c in coordenadas_limpas]
     df_util['lon'] = [c[1] for c in coordenadas_limpas]
     
-    # Remove qualquer linha cujo texto não virou número de verdade
+    # Remove qualquer linha inválida
     df_util = df_util.dropna(subset=['lat', 'lon'])
     
-    # Define os textos padrões para evitar células em branco
+    # Substitui vazios pelos nomes padrões
     df_util['classificacao_cor'] = df_util['classificacao'].replace("", "Outro tipo")
     df_util['descricao_popup'] = df_util['descricao'].replace("", "Sem descrição")
     
@@ -60,7 +59,7 @@ except Exception as e:
     st.stop()
 
 def obter_cor(classificacao):
-    classe = str(classificacao).upper()
+    classe = str(classificacao).upper().strip()
     if 'PREVENTIVA' in classe:
         return '#008000' # Verde
     elif 'IMPLANTAÇÃO' in classe or 'IMPLANTACAO' in classe:
@@ -79,8 +78,7 @@ if not df_mapa.empty:
     centro_lat, centro_lon = df_mapa['lat'].mean(), df_mapa['lon'].mean()
     zoom_inicial = 12
 else:
-    # Caso a planilha esteja sem dados válidos no momento
-    centro_lat, centro_lon = -31.7655, -52.3376 # Centro padrão em Pelotas/RS
+    centro_lat, centro_lon = -31.7655, -52.3376 # Pelotas/RS caso falte dados
     zoom_inicial = 12
 
 if coordenada_livre:
@@ -97,7 +95,7 @@ m = folium.Map(location=[centro_lat, centro_lon], zoom_start=zoom_inicial, contr
 if coordenada_livre:
     folium.CircleMarker(location=[centro_lat, centro_lon], radius=10, color="black", fill=True, fill_color="yellow", fill_opacity=1, popup="Sua busca").add_to(m)
 
-# Desenha as bolinhas direto no mapa, pulando erros caso a tabela esteja vazia
+# Insere as bolinhas separadas diretamente no mapa
 if not df_mapa.empty:
     for _, linha in df_mapa.iterrows():
         cor = obter_cor(linha['classificacao_cor'])
