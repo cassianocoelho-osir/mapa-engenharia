@@ -3,71 +3,106 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 from folium.plugins import MarkerCluster
-from geopy.distance import geodesic
 
 st.set_page_config(layout="wide", page_title="Mapa de Engenharia")
-st.title("🗺️ Mapa da Engenharia - Alta Volumetria em Tempo Real")
+st.title("🗺️ Mapa da Engenharia")
 
-# --- LINK DA SUA PLANILHA DO GOOGLE DRIVE ---
-# Substitua o ID abaixo pelo ID real da sua planilha do Google Sheets
-ID_PLANILHA = "1i52bMXlaOCrvKFjZPwxmV_NvpdVzf6tHrCIGUMGZnDQ"
+# --- LINK DA SUA PLANILHA ---
+ID_PLANILHA = "COLE_AQUI_O_ID_DA_SUA_PLANILHA"
 URL_CSV = f"https://docs.google.com/spreadsheets/d/{ID_PLANILHA}/export?format=csv"
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def carregar_dados():
+    # Carrega a planilha forçando o nome das colunas principais pelas letras
     df = pd.read_csv(URL_CSV)
-    df = df.dropna(subset=['Coordenada'])
-    df[['lat', 'lon']] = df['Coordenada'].str.split(',', expand=True).astype(float)
+    
+    # Ajuste automático caso os nomes das colunas variem (pega por posição se necessário)
+    # Coluna H (Posição 7), Coluna J (Posição 9), Coluna L (Posição 11)
+    col_coordenada = 'Coordenada' if 'Coordenada' in df.columns else df.columns[7]
+    col_classificacao = df.columns[9]
+    col_descricao = df.columns[11]
+    
+    df = df.dropna(subset=[col_coordenada])
+    df[['lat', 'lon']] = df[col_coordenada].str.split(',', expand=True).astype(float)
+    
+    # Padroniza os nomes internos para o código funcionar sempre
+    df['classificacao_cor'] = df[col_classificacao].astype(str).str.strip()
+    df['descricao_popup'] = df[col_descricao].astype(str)
+    
     return df
 
 try:
     df_mapa = carregar_dados()
 except Exception as e:
-    st.error(f"Erro ao conectar com a planilha. Verifique se está pública. Erro: {e}")
+    st.error(f"Erro ao carregar os dados. Verifique as colunas H, J e L. Erro: {e}")
     st.stop()
 
-# --- PAINEL LATERAL DE BUSCA LIVRE ---
-st.sidebar.header("🔍 Pesquisa por Proximidade")
+# --- FUNÇÃO PARA DEFINIR CORES POR CLASSIFICAÇÃO (Coluna J) ---
+def obter_cor(classificacao):
+    # Transforma em minúsculo para evitar problemas com espaços ou maiúsculas
+    classe = classificacao.lower()
+    if 'alta' in classe or 'urgente' in classe or 'a' in classe:
+        return '#FF0000' # Vermelho
+    elif 'media' in classe or 'morna' in classe or 'b' in classe:
+        return '#FFA500' # Laranja
+    elif 'baixa' in classe or 'fria' in classe or 'c' in classe:
+        return '#008000' # Verde
+    else:
+        return '#1f77b4' # Azul Padrão (Caso mude o texto na coluna J)
+
+# --- PAINEL LATERAL DE BUSCA ---
+st.sidebar.header("🔍 Centralizar Coordenada")
 coordenada_livre = st.sidebar.text_input(
-    "Cola qualquer coordenada livre (Lat, Lon):", 
+    "Digite ou cole a coordenada (Lat, Lon):", 
     placeholder="-31.9460, -51.9617"
 )
-raio_busca = st.sidebar.slider("Raio de verificação (em metros):", 100, 10000, 2000)
 
+# Define o centro padrão do mapa (média de todos os pontos)
 centro_lat, centro_lon = df_mapa['lat'].mean(), df_mapa['lon'].mean()
-ponto_pesquisado = None
+zoom_inicial = 12
 
+# Se o usuário pesquisar uma coordenada, o mapa muda o centro para lá
 if coordenada_livre:
     try:
         plat, plon = map(float, coordenada_livre.split(','))
         centro_lat, centro_lon = plat, plon
-        ponto_pesquisado = (plat, plon)
-        st.sidebar.success("Coordenada localizada!")
+        zoom_inicial = 16  # Dá um zoom maior para focar no ponto pesquisado
+        st.sidebar.success("Centralizado na coordenada com sucesso!")
     except:
-        st.sidebar.error("Formato inválido. Use: -31.9460, -51.9617")
-
-# --- FILTRO MATEMÁTICO DE ALTA PERFORMANCE ---
-if ponto_pesquisado:
-    def calcular_distancia(linha):
-        return geodesic(ponto_pesquisado, (linha['lat'], merge_lon:=linha['lon'])).meters <= raio_busca
-    df_filtrado = df_mapa[df_mapa.apply(calcular_distancia, axis=1)]
-    st.subheader(f"📌 Encontrados {len(df_filtrado)} pontos no raio de {raio_busca} metros.")
-else:
-    df_filtrado = df_mapa
-    st.subheader(f"📊 Exibindo base completa ({len(df_mapa)} registros).")
+        st.sidebar.error("Formato inválido. Use o padrão: -31.9460, -51.9617")
 
 # --- CRIAÇÃO DO MAPA ---
-m = folium.Map(location=[centro_lat, centro_lon], zoom_start=12, control_scale=True)
+m = folium.Map(location=[centro_lat, centro_lon], zoom_start=zoom_inicial, control_scale=True)
 
-if ponto_pesquisado:
-    folium.Marker(ponto_pesquisado, popup=f"Busca: {coordenada_livre}", icon=folium.Icon(color="red", icon="search")).add_to(m)
-    folium.Circle(radius=raio_busca, location=ponto_pesquisado, color="red", fill=True, fill_opacity=0.08).add_to(m)
+# Adiciona um marcador de destaque caso tenha pesquisado uma coordenada específica
+if coordenada_livre:
+    folium.CircleMarker(
+        location=[centro_lat, centro_lon],
+        radius=10,
+        color="black",
+        fill=True,
+        fill_color="yellow",
+        fill_opacity=1,
+        popup="Sua busca"
+    ).add_to(m)
 
-# Cluster para não travar com 100k pontos
-marker_cluster = MarkerCluster().add_to(m)
+# Agrupamento (Cluster) para alta volumetria de pontos
+marker_cluster = MarkerCluster(disable_clustering_at_zoom=16).add_to(m)
 
-for _, linha in df_filtrado.iterrows():
-    detalhes = f"<b>Protocolo:</b> {linha.get('numero_protocolo', '')}<br><b>Status:</b> {linha.get('status', '')}"
-    folium.Marker([linha['lat'], linha['lon']], popup=folium.Popup(detalhes, max_width=300)).add_to(marker_cluster)
+# Desenha os pontos na tela
+for _, linha in df_mapa.iterrows():
+    cor_ponto = obter_cor(linha['classificacao_cor'])
+    texto_popup = f"<b>Classificação:</b> {linha['classificacao_cor']}<br><b>Descrição:</b> {linha['descricao_popup']}"
+    
+    folium.CircleMarker(
+        location=[linha['lat'], linha['lon']],
+        radius=6,
+        color=cor_ponto,
+        fill=True,
+        fill_color=cor_ponto,
+        fill_opacity=0.8,
+        popup=folium.Popup(texto_popup, max_width=300)
+    ).add_to(marker_cluster)
 
-st_folium(m, width=1300, height=700)
+# CRUCIAL: 'returned_objects=[]' deixa o mapa estático. Ele não recarrega nada ao dar zoom ou mover.
+st_folium(m, width=1300, height=700, returned_objects=[])
