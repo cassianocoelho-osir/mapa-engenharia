@@ -8,9 +8,8 @@ st.set_page_config(layout="wide", page_title="Mapa de Engenharia")
 st.title("🗺️ Mapa da Engenharia")
 
 # --- LINK DA SUA PLANILHA ---
-ID_PLANILHA = "COLE_AQUI_O_ID_DA_SUA_PLANILHA"
+ID_PLANILHA = "1i52bMXlaOCrvKFjZPwxmV_NvpdVzf6tHrCIGUMGZnDQ"}
 URL_CSV = f"https://docs.google.com/spreadsheets/d/{ID_PLANILHA}/export?format=csv"
-
 @st.cache_data(ttl=600)
 def carregar_dados():
     # Carrega a planilha forçando o nome das colunas principais pelas letras
