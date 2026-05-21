@@ -8,8 +8,9 @@ st.set_page_config(layout="wide", page_title="Mapa de Engenharia")
 st.title("🗺️ Mapa da Engenharia")
 
 # --- LINK DA SUA PLANILHA ---
-ID_PLANILHA = "1i52bMXlaOCrvKFjZPwxmV_NvpdVzf6tHrCIGUMGZnDQ"}
+ID_PLANILHA = "1i52bMXlaOCrvKFjZPwxmV_NvpdVzf6tHrCIGUMGZnDQ"
 URL_CSV = f"https://docs.google.com/spreadsheets/d/{ID_PLANILHA}/export?format=csv"
+
 @st.cache_data(ttl=600)
 def carregar_dados():
     # Carrega a planilha forçando o nome das colunas principais pelas letras
@@ -90,18 +91,4 @@ marker_cluster = MarkerCluster(disable_clustering_at_zoom=16).add_to(m)
 
 # Desenha os pontos na tela
 for _, linha in df_mapa.iterrows():
-    cor_ponto = obter_cor(linha['classificacao_cor'])
-    texto_popup = f"<b>Classificação:</b> {linha['classificacao_cor']}<br><b>Descrição:</b> {linha['descricao_popup']}"
-    
-    folium.CircleMarker(
-        location=[linha['lat'], linha['lon']],
-        radius=6,
-        color=cor_ponto,
-        fill=True,
-        fill_color=cor_ponto,
-        fill_opacity=0.8,
-        popup=folium.Popup(texto_popup, max_width=300)
-    ).add_to(marker_cluster)
-
-# CRUCIAL: 'returned_objects=[]' deixa o mapa estático. Ele não recarrega nada ao dar zoom ou mover.
-st_folium(m, width=1300, height=700, returned_objects=[])
+    cor_ponto = obter_cor(linha
